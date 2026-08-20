@@ -278,7 +278,7 @@
       ticketNo: '受付番号', party: (name,count)=> name+' 様　'+count+'名',
       wish: (seat)=> 'ご希望: '+seat,
       statusWaiting: (t)=> '順番になりましたらお呼びいたします（'+t+'）',
-      statusCalled: 'お呼び出ししました。店内スタッフへお声がけください',
+      statusCalled: 'お待たせいたしました。店内スタッフへお声掛けください。',
       statusEnded: 'このチケットは終了しています',
       newEntry: '新しく受付する',
       justNow: 'たった今', waitMin: (n)=> n+'分待ち'
@@ -378,6 +378,29 @@
   let historyOpen = false;
   let pollTimer = null;
   let busy = false;
+  let lastKnownTicketStatus = null; // used to detect the waiting→called transition for the alert sound/vibration
+
+  function playCallAlert(){
+    // Two-tone chime via Web Audio API — no external file needed, works offline.
+    try{
+      const ctx = new (window.AudioContext || window.webkitAudioContext)();
+      const now = ctx.currentTime;
+      [ [880, 0], [1175, 0.18] ].forEach(([freq, delay])=>{
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.value = freq;
+        gain.gain.setValueAtTime(0, now + delay);
+        gain.gain.linearRampToValueAtTime(0.35, now + delay + 0.02);
+        gain.gain.linearRampToValueAtTime(0, now + delay + 0.32);
+        osc.connect(gain); gain.connect(ctx.destination);
+        osc.start(now + delay);
+        osc.stop(now + delay + 0.34);
+      });
+      setTimeout(()=>{ try{ ctx.close(); }catch(e){} }, 800);
+    }catch(e){ /* Web Audio unavailable — silently skip */ }
+    try{ if(navigator.vibrate) navigator.vibrate([200,100,200,100,200]); }catch(e){ /* vibration unavailable — silently skip */ }
+  }
 
   function lanternSVG(){
     return '<svg viewBox="0 0 100 130" xmlns="http://www.w3.org/2000/svg">'+
@@ -509,6 +532,13 @@
     const waitingCount = state.entries.filter(e => e.status==='waiting' || e.status==='called').length;
 
     if(myTicket){
+      // Alert with sound + vibration the moment this ticket flips to "called" —
+      // only fires on the transition itself, never on every re-render.
+      if(myTicket.status === 'called' && lastKnownTicketStatus !== 'called'){
+        playCallAlert();
+      }
+      lastKnownTicketStatus = myTicket.status;
+
       root.innerHTML =
         '<div class="hn-shell">'+
         '<div class="hn-header"><div class="hn-mark">'+markSVG()+'</div>'+
@@ -529,7 +559,7 @@
             '<button class="hn-back" id="hnNewEntry">'+tr.newEntry+'</button>' : '')+
         '</div></div>';
       if(document.getElementById('hnNewEntry')){
-        document.getElementById('hnNewEntry').onclick = async ()=>{ myTicketId=null; await clearMyTicket(); render(); };
+        document.getElementById('hnNewEntry').onclick = async ()=>{ myTicketId=null; lastKnownTicketStatus=null; await clearMyTicket(); render(); };
       }
       bindCustomerTabs(); bindLangBar();
       return;
@@ -591,6 +621,7 @@
       // (The save itself reliably lands even on the rare occasion the client-side
       // acknowledgement is slow or drops, so there's no need to block on it here.)
       myTicketId = entry.id;
+      lastKnownTicketStatus = entry.status;
       render();
 
       saveState().catch(saveErr=>{
