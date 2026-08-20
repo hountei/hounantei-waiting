@@ -250,7 +250,7 @@
 <script>
 (function(){
   const root = document.getElementById('hnRoot');
-  const STORAGE_KEY = 'hounantei-waiting-state';
+  const FIREBASE_DB_URL = 'https://hounantei-waiting-default-rtdb.firebaseio.com';
   const TICKET_KEY = 'hn-my-ticket-id';
 
   const LANGS = [
@@ -413,36 +413,47 @@
     throw lastErr;
   }
 
+  async function fbGet(path){
+    const res = await fetch(FIREBASE_DB_URL + path + '.json');
+    if(!res.ok) throw new Error('Firebase GET failed: HTTP ' + res.status);
+    return res.json();
+  }
+  async function fbPut(path, value){
+    const res = await fetch(FIREBASE_DB_URL + path + '.json', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(value)
+    });
+    if(!res.ok) throw new Error('Firebase PUT failed: HTTP ' + res.status);
+    return res.json();
+  }
+
   async function loadState(){
     try{
-      const res = await withRetry(()=>window.storage.get(STORAGE_KEY, true), 2);
-      if(res && res.value){ state = JSON.parse(res.value); }
-    }catch(e){ /* key not found yet, or genuinely unreachable — fall back to in-memory state */ }
+      const data = await withRetry(()=>fbGet('/state'), 2);
+      if(data){ state = data; if(!Array.isArray(state.entries)) state.entries = []; if(typeof state.counter !== 'number') state.counter = 0; }
+    }catch(e){ /* unreachable — fall back to in-memory state */ }
   }
   async function saveState(){
-    await withRetry(()=>window.storage.set(STORAGE_KEY, JSON.stringify(state), true), 3);
+    await withRetry(()=>fbPut('/state', state), 3);
   }
   async function verifyEntrySaved(id){
     // Unlike loadState(), this does not swallow errors — callers need to know
     // whether the confirmation read itself succeeded, not just fall back silently.
-    const res = await withRetry(()=>window.storage.get(STORAGE_KEY, true), 2);
-    if(res && res.value){
-      const remote = JSON.parse(res.value);
-      return remote.entries.some(e => e.id === id);
+    const data = await withRetry(()=>fbGet('/state'), 2);
+    if(data && Array.isArray(data.entries)){
+      return data.entries.some(e => e.id === id);
     }
     return false;
   }
-  async function loadMyTicket(){
-    try{
-      const res = await withRetry(()=>window.storage.get(TICKET_KEY, false), 2);
-      if(res && res.value){ myTicketId = res.value; }
-    }catch(e){ /* not set yet */ }
+  function loadMyTicket(){
+    try{ myTicketId = localStorage.getItem(TICKET_KEY) || null; }catch(e){ /* not available */ }
   }
-  async function saveMyTicket(id){
-    try{ await withRetry(()=>window.storage.set(TICKET_KEY, id, false), 2); }catch(e){ console.error('[宝雲亭] failed to save ticket id:', e); }
+  function saveMyTicket(id){
+    try{ localStorage.setItem(TICKET_KEY, id); }catch(e){ console.error('[宝雲亭] failed to save ticket id:', e); }
   }
-  async function clearMyTicket(){
-    try{ await withRetry(()=>window.storage.delete(TICKET_KEY, false), 2); }catch(e){ console.error('[宝雲亭] failed to clear ticket id:', e); }
+  function clearMyTicket(){
+    try{ localStorage.removeItem(TICKET_KEY); }catch(e){ console.error('[宝雲亭] failed to clear ticket id:', e); }
   }
 
   function isToday(ts){
