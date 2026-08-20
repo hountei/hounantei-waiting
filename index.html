@@ -158,12 +158,15 @@
   .hn-submit:disabled{ opacity: 0.6; cursor: default; }
   .hn-err{ color: var(--red-bright); font-size: 12px; margin-top: 8px; min-height: 16px; }
 
-  /* lantern ticket */
-  .hn-ticket{ text-align:center; padding: 10px 4px 4px; }
-  .hn-lantern{ width: 150px; margin: 0 auto 14px; position: relative; }
-  .hn-lantern svg{ width: 100%; filter: drop-shadow(0 8px 18px rgba(199,68,48,0.4)); }
-  .hn-ticket-num{
-    font-family: var(--font-display); font-size: 15px; color: var(--gold-soft); letter-spacing:0.2em;
+  /* ticket display */
+  .hn-ticket{ text-align:center; padding: 26px 4px 8px; }
+  .hn-ticket-label{
+    font-size: 13px; color: var(--muted); letter-spacing:0.2em; font-weight: 700;
+  }
+  .hn-ticket-bignum{
+    font-family: var(--font-display); font-weight: 800; font-size: 76px; line-height: 1.1;
+    color: var(--gold-soft); margin: 8px 0 4px; letter-spacing: 0.04em;
+    text-shadow: 0 6px 22px rgba(201,161,60,0.4);
   }
   .hn-ticket-name{ font-size: 18px; font-weight: 700; margin-top: 10px; }
   .hn-ticket-meta{ color: var(--muted); font-size: 13px; margin-top: 4px; }
@@ -400,7 +403,7 @@
       });
       setTimeout(()=>{ try{ ctx.close(); }catch(e){} }, 800);
     }catch(e){ /* Web Audio unavailable — silently skip */ }
-    try{ if(navigator.vibrate) navigator.vibrate([200,100,200,100,200]); }catch(e){ /* vibration unavailable — silently skip */ }
+    try{ if(navigator.vibrate) navigator.vibrate([800,400,800,400,800]); }catch(e){ /* vibration unavailable — silently skip */ }
   }
 
   function lanternSVG(){
@@ -496,9 +499,7 @@
   }
 
   function tabsHTML(){
-    // Used on the staff page only — lets staff jump back to the customer view for testing.
     return '<div class="hn-tabs">'+
-      '<a class="hn-tab-link" href="#" data-nav="customer">受付</a>'+
       '<a class="hn-tab-link active" href="#" data-nav="staff">スタッフ</a>'+
       '</div>';
   }
@@ -547,8 +548,8 @@
         customerTabsHTML()+
         langBarHTML()+
         '<div class="hn-card hn-ticket">'+
-          '<div class="hn-lantern">'+lanternSVG()+'</div>'+
-          '<div class="hn-ticket-num">'+tr.ticketNo+' &nbsp;No.'+myTicket.number+'</div>'+
+          '<div class="hn-ticket-label">'+tr.ticketNo+'</div>'+
+          '<div class="hn-ticket-bignum">No.'+myTicket.number+'</div>'+
           '<div class="hn-ticket-name">'+escapeHTML(tr.party(myTicket.name, myTicket.count))+'</div>'+
           '<div class="hn-ticket-meta">'+escapeHTML(tr.wish(tr.seats[myTicket.seat] || myTicket.seat))+'</div>'+
           '<div class="hn-ticket-status '+(myTicket.status==='called'?'called':'')+'">'+
@@ -725,12 +726,17 @@
     });
   }
 
+  function clockTimeJa(ts){
+    const d = new Date(ts);
+    return String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0');
+  }
+
   function rowHTML(e){
     return '<div class="hn-row '+(e.status==='called'?'called':'')+'">'+
       '<div class="hn-row-num">'+e.number+'</div>'+
       '<div class="hn-row-main">'+
         '<div class="hn-row-name">'+escapeHTML(e.name)+' 様　'+e.count+'名</div>'+
-        '<div class="hn-row-sub"><span>'+seatLabel(e.seat)+'</span><span>'+timeAgoJa(e.createdAt)+'</span>'+
+        '<div class="hn-row-sub"><span>'+seatLabel(e.seat)+'</span><span>'+clockTimeJa(e.createdAt)+'受付</span><span>'+timeAgoJa(e.createdAt)+'</span>'+
           '<span class="hn-badge '+(e.status==='called'?'called':'')+'">'+(e.status==='called'?'呼出済':'待機中')+'</span></div>'+
       '</div>'+
       '<div class="hn-row-actions">'+
@@ -747,7 +753,7 @@
       '<div class="hn-row-num">'+e.number+'</div>'+
       '<div class="hn-row-main">'+
         '<div class="hn-row-name">'+escapeHTML(e.name)+' 様　'+e.count+'名</div>'+
-        '<div class="hn-row-sub"><span>'+seatLabel(e.seat)+'</span>'+
+        '<div class="hn-row-sub"><span>'+seatLabel(e.seat)+'</span><span>'+clockTimeJa(e.createdAt)+'受付</span>'+
           (waited!==null ? '<span>待ち時間 '+waited+'分</span>' : '')+
           '<span class="hn-badge '+(e.status==='done'?'done':'cancelled')+'">'+statusLabel+'</span></div>'+
       '</div></div>';
