@@ -54,15 +54,12 @@
 
   /* header */
   .hn-header{ text-align:center; margin-bottom: 18px; }
-  .hn-mark{ display:flex; justify-content:center; margin-bottom: 10px; }
-  .hn-mark svg{ width:40px; height:40px; }
-  .hn-title{
-    font-family: var(--font-display);
-    font-weight: 800;
-    font-size: 26px;
-    letter-spacing: 0.12em;
-    color: var(--paper);
-    margin: 0;
+  .hn-logo{
+    display: block;
+    margin: 0 auto;
+    height: 64px;
+    width: auto;
+    filter: drop-shadow(0 2px 10px rgba(0,0,0,0.35));
   }
   .hn-sub{
     font-size: 12px;
@@ -419,11 +416,9 @@
       '<stop offset="0%" stop-color="#e35a3f"/><stop offset="100%" stop-color="#a8371f"/>'+
       '</radialGradient></defs></svg>';
   }
-  function markSVG(){
-    return '<svg viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg">'+
-      '<circle cx="20" cy="20" r="18" fill="none" stroke="#c9a13c" stroke-width="1.5"/>'+
-      '<text x="20" y="27" text-anchor="middle" font-family="Shippori Mincho, serif" font-size="17" fill="#e6c874" font-weight="700">宝</text>'+
-      '</svg>';
+  var LOGO_DATA_URI = 'data:image/png;base64,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';
+  function logoHTML(){
+    return '<img class="hn-logo" src="'+LOGO_DATA_URI+'" alt="宝雲亭 中洲本店">';
   }
 
   async function withRetry(fn, attempts){
@@ -543,8 +538,8 @@
 
       root.innerHTML =
         '<div class="hn-shell">'+
-        '<div class="hn-header"><div class="hn-mark">'+markSVG()+'</div>'+
-        '<h1 class="hn-title">宝雲亭</h1><div class="hn-sub">'+tr.subTicket+'</div></div>'+
+        '<div class="hn-header">'+logoHTML()+
+        '<div class="hn-sub">'+tr.subTicket+'</div></div>'+
         customerTabsHTML()+
         langBarHTML()+
         '<div class="hn-card hn-ticket">'+
@@ -569,8 +564,8 @@
 
     root.innerHTML =
       '<div class="hn-shell">'+
-      '<div class="hn-header"><div class="hn-mark">'+markSVG()+'</div>'+
-      '<h1 class="hn-title">宝雲亭</h1><div class="hn-sub">'+tr.subCustomer+'</div></div>'+
+      '<div class="hn-header">'+logoHTML()+
+      '<div class="hn-sub">'+tr.subCustomer+'</div></div>'+
       customerTabsHTML()+
       langBarHTML()+
       '<div class="hn-card">'+
@@ -647,8 +642,8 @@
 
     root.innerHTML =
       '<div class="hn-shell">'+
-      '<div class="hn-header"><div class="hn-mark">'+markSVG()+'</div>'+
-      '<h1 class="hn-title">宝雲亭</h1><div class="hn-sub">'+tr.statusHeading+'</div></div>'+
+      '<div class="hn-header">'+logoHTML()+
+      '<div class="hn-sub">'+tr.statusHeading+'</div></div>'+
       customerTabsHTML()+
       langBarHTML()+
       '<div class="hn-summary">'+
@@ -679,8 +674,8 @@
 
     root.innerHTML =
       '<div class="hn-shell wide">'+ tabsHTML() +
-      '<div class="hn-header"><div class="hn-mark">'+markSVG()+'</div>'+
-      '<h1 class="hn-title">宝雲亭</h1><div class="hn-sub">スタッフ用 待ちリスト管理</div></div>'+
+      '<div class="hn-header">'+logoHTML()+
+      '<div class="hn-sub">スタッフ用 待ちリスト管理</div></div>'+
       '<div class="hn-summary">'+
         '<div class="hn-summary-item"><div class="hn-summary-num">'+active.length+'</div><div class="hn-summary-label">現在お待ちの組数</div></div>'+
         '<div class="hn-summary-item"><div class="hn-summary-num">'+waitingOnly.length+'</div><div class="hn-summary-label">未呼出</div></div>'+
