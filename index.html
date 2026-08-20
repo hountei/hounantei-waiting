@@ -252,6 +252,7 @@
   const root = document.getElementById('hnRoot');
   const FIREBASE_DB_URL = 'https://hounantei-waiting-default-rtdb.firebaseio.com';
   const TICKET_KEY = 'hn-my-ticket-id';
+  const APP_VERSION = 'V202608200858'; // bumped on every deploy — checked against version.json to auto-reload stale pages
 
   const LANGS = [
     { code: 'ja', label: '日本語' },
@@ -787,11 +788,28 @@
     busy = false;
   }
 
+  async function checkForUpdate(){
+    try{
+      const res = await fetch('./version.json?t=' + Date.now(), { cache: 'no-store' });
+      if(!res.ok) return;
+      const data = await res.json();
+      if(data && data.v && data.v !== APP_VERSION && !isEditingForm()){
+        // A new version has been deployed — reload so this page (and anyone
+        // who's had it open a while, e.g. a waiting customer's ticket screen)
+        // picks up the latest code. Skipped only while someone's actively
+        // typing into the check-in form, so nothing gets wiped mid-entry;
+        // it will simply retry on the next check.
+        location.reload();
+      }
+    }catch(e){ /* offline or blocked — just retry on the next interval */ }
+  }
+
   (async function init(){
     root.innerHTML = '<div class="hn-shell"><div class="hn-header"><div class="hn-sub">読み込み中…</div></div></div>';
     await loadMyTicket();
     await tick();
     pollTimer = setInterval(tick, 4000);
+    setInterval(checkForUpdate, 30000);
   })();
 })();
 </script>
