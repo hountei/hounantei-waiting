@@ -222,6 +222,7 @@
 
   /* history panel */
   .hn-history{ margin-bottom: 16px; }
+  .hn-history-day + .hn-history-day{ margin-top: 8px; }
   .hn-history-toggle{
     width:100%; display:flex; justify-content:space-between; align-items:center;
     background: var(--panel); border: 1px solid var(--line); border-radius: 12px;
@@ -253,6 +254,8 @@
   const FIREBASE_DB_URL = 'https://hounantei-waiting-default-rtdb.firebaseio.com';
   const TICKET_KEY = 'hn-my-ticket-id';
   const APP_VERSION = 'V202608201400'; // bumped on every deploy — checked against version.json to auto-reload stale pages
+  const DAY_MS = 24*60*60*1000;
+  const HISTORY_WINDOW_MS = 7 * DAY_MS; // staff history is kept and shown for a rolling 7 days
 
   const LANGS = [
     { code: 'ja', label: '日本語' },
@@ -376,7 +379,8 @@
   let customerSubview = 'checkin'; // 'checkin' | 'status' — customer-facing tabs only
   let myTicketId = null;
   let lang = 'ja';
-  let historyOpen = false;
+  let openHistoryDays = new Set();
+  let prunedThisSession = false;
   let pollTimer = null;
   let busy = false;
   let lastKnownTicketStatus = null; // used to detect the waiting→called transition for the alert sound/vibration
@@ -481,6 +485,16 @@
   function isToday(ts){
     const d = new Date(ts), n = new Date();
     return d.getFullYear()===n.getFullYear() && d.getMonth()===n.getMonth() && d.getDate()===n.getDate();
+  }
+  function dayKeyJa(ts){
+    const d = new Date(ts);
+    return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+  }
+  function dayLabelJa(ts){
+    const d = new Date(ts);
+    const wd = ['日','月','火','水','木','金','土'][d.getDay()];
+    const md = (d.getMonth()+1)+'月'+d.getDate()+'日('+wd+')';
+    return isToday(ts) ? '本日 '+md : md;
   }
   function timeAgo(ts){
     const tr = T[lang];
@@ -669,8 +683,19 @@
       .sort((a,b)=>a.number-b.number);
     const waitingOnly = active.filter(e=>e.status==='waiting');
     const longestWaitMin = active.length ? Math.max(...active.map(e=>Math.floor((Date.now()-e.createdAt)/60000))) : 0;
-    const history = state.entries.filter(e => (e.status==='done' || e.status==='cancelled') && isToday(e.createdAt))
-      .sort((a,b)=>b.number-a.number);
+    const historyCutoff = Date.now() - HISTORY_WINDOW_MS;
+    const historyEntries = state.entries.filter(e => (e.status==='done' || e.status==='cancelled') && e.createdAt >= historyCutoff)
+      .sort((a,b)=>b.createdAt-a.createdAt);
+    const historyGroups = [];
+    const historyGroupsByKey = {};
+    historyEntries.forEach(e=>{
+      const key = dayKeyJa(e.createdAt);
+      if(!historyGroupsByKey[key]){
+        historyGroupsByKey[key] = { key: key, label: dayLabelJa(e.createdAt), items: [] };
+        historyGroups.push(historyGroupsByKey[key]);
+      }
+      historyGroupsByKey[key].items.push(e);
+    });
 
     root.innerHTML =
       '<div class="hn-shell wide">'+ tabsHTML() +
@@ -682,14 +707,17 @@
         '<div class="hn-summary-item"><div class="hn-summary-num">'+(active.length? longestWaitMin+'分' : '−')+'</div><div class="hn-summary-label">最長待ち時間</div></div>'+
       '</div>'+
       '<div class="hn-history">'+
-        '<button class="hn-history-toggle" id="hnHistToggle">'+
-          '<span>本日の対応済みお客様（'+history.length+'組）</span>'+
-          '<span class="hn-chev">'+(historyOpen?'閉じる ▲':'開く ▼')+'</span>'+
-        '</button>'+
-        (historyOpen ? '<div class="hn-history-list">'+
-          (history.length===0 ? '<div class="hn-empty">本日対応済みのお客様はまだいません</div>' :
-            history.map(historyRowHTML).join(''))+
-          '</div>' : '')+
+        (historyGroups.length===0 ? '<div class="hn-history-toggle" style="cursor:default;"><span>過去7日間の対応履歴はまだありません</span></div>' :
+          historyGroups.map(function(g){
+            const open = openHistoryDays.has(g.key);
+            return '<div class="hn-history-day">'+
+              '<button class="hn-history-toggle" data-hist-key="'+g.key+'">'+
+                '<span>'+g.label+'　対応済み（'+g.items.length+'組）</span>'+
+                '<span class="hn-chev">'+(open?'閉じる ▲':'開く ▼')+'</span>'+
+              '</button>'+
+              (open ? '<div class="hn-history-list">'+g.items.map(historyRowHTML).join('')+'</div>' : '')+
+            '</div>';
+          }).join(''))+
       '</div>'+
       '<div class="hn-card">'+
         '<div class="hn-staffbar"><span class="hn-updated">'+active.length+'組が待機中です</span>'+
@@ -699,10 +727,22 @@
       '</div></div>';
     bindTabs();
 
-    document.getElementById('hnHistToggle').onclick = ()=>{ historyOpen = !historyOpen; render(); };
+    root.querySelectorAll('[data-hist-key]').forEach(btn=>{
+      btn.onclick = ()=>{
+        const key = btn.getAttribute('data-hist-key');
+        if(openHistoryDays.has(key)) openHistoryDays.delete(key); else openHistoryDays.add(key);
+        render();
+      };
+    });
     document.getElementById('hnReset').onclick = async ()=>{
-      if(!confirm('本日の受付リストをすべてリセットします。よろしいですか？')) return;
-      state = { counter: 0, entries: [] };
+      if(!confirm('待機中のお客様をクリアし、受付番号を1からリセットします。過去7日間の対応履歴は保持されます。よろしいですか？')) return;
+      const now = Date.now();
+      const cutoff = now - HISTORY_WINDOW_MS;
+      state.entries.forEach(e=>{
+        if(e.status==='waiting' || e.status==='called'){ e.status='cancelled'; e.finishedAt = now; }
+      });
+      state.entries = state.entries.filter(e => e.createdAt >= cutoff);
+      state.counter = 0;
       await saveState();
       render();
     };
@@ -783,6 +823,15 @@
     busy = true;
     try{
       await loadState();
+      if(view==='staff' && !prunedThisSession){
+        // One-time per staff session: drop finished entries past the 7-day
+        // history window so the Firebase state doesn't grow unbounded.
+        prunedThisSession = true;
+        const cutoff = Date.now() - HISTORY_WINDOW_MS;
+        const before = state.entries.length;
+        state.entries = state.entries.filter(e => !((e.status==='done'||e.status==='cancelled') && e.createdAt < cutoff));
+        if(state.entries.length !== before) await saveState();
+      }
       if(!isEditingForm()) render();
     }
     catch(e){ /* ignore transient errors */ }
