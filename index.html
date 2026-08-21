@@ -253,9 +253,10 @@
   const root = document.getElementById('hnRoot');
   const FIREBASE_DB_URL = 'https://hounantei-waiting-default-rtdb.firebaseio.com';
   const TICKET_KEY = 'hn-my-ticket-id';
-  const APP_VERSION = 'V202608210932'; // bumped on every deploy — checked against version.json to auto-reload stale pages
+  const APP_VERSION = 'V202608211000'; // bumped on every deploy — checked against version.json to auto-reload stale pages
   const DAY_MS = 24*60*60*1000;
   const HISTORY_WINDOW_MS = 7 * DAY_MS; // staff history is kept and shown for a rolling 7 days
+  const HOMEPAGE_URL = 'https://hountei.com/';
 
   const LANGS = [
     { code: 'ja', label: '日本語' },
@@ -284,6 +285,7 @@
       statusWaiting: (t)=> '順番になりましたらお呼びいたします（'+t+'）',
       statusCalled: 'お待たせいたしました。店内スタッフへお声掛けください。',
       statusEnded: 'このチケットは終了しています',
+      statusDone: 'ご来店ありがとうございました。まもなくトップページに移動します',
       newEntry: '新しく受付する',
       justNow: 'たった今', waitMin: (n)=> n+'分待ち'
     },
@@ -305,6 +307,7 @@
       statusWaiting: (t)=> "We'll call your name when your table is ready ("+t+')',
       statusCalled: "You're up! Please check in with our staff.",
       statusEnded: 'This ticket has ended.',
+      statusDone: 'Thank you for visiting us! Redirecting to our homepage…',
       newEntry: 'Join the wait list again',
       justNow: 'Just now', waitMin: (n)=> 'Waiting '+n+' min'
     },
@@ -326,6 +329,7 @@
       statusWaiting: (t)=> '순서가 되면 호출해 드립니다 ('+t+')',
       statusCalled: '호출되었습니다. 매장 직원에게 말씀해 주세요.',
       statusEnded: '이 접수증은 종료되었습니다.',
+      statusDone: '방문해 주셔서 감사합니다. 곧 홈페이지로 이동합니다.',
       newEntry: '다시 접수하기',
       justNow: '방금 전', waitMin: (n)=> n+'분 대기'
     },
@@ -347,6 +351,7 @@
       statusWaiting: (t)=> '輪到您時將會叫號（'+t+'）',
       statusCalled: '已叫號，請洽店內服務人員',
       statusEnded: '此候位券已結束',
+      statusDone: '感謝您的光臨，即將跳轉至首頁',
       newEntry: '重新登記',
       justNow: '剛剛', waitMin: (n)=> '已等候 '+n+' 分鐘'
     },
@@ -368,6 +373,7 @@
       statusWaiting: (t)=> '轮到您时将会叫号（'+t+'）',
       statusCalled: '已叫号，请联系店内服务人员',
       statusEnded: '此候位券已结束',
+      statusDone: '感谢您的光临，即将跳转至首页',
       newEntry: '重新登记',
       justNow: '刚刚', waitMin: (n)=> '已等候 '+n+' 分钟'
     }
@@ -564,9 +570,10 @@
           '<div class="hn-ticket-status '+(myTicket.status==='called'?'called':'')+'">'+
             (myTicket.status==='called' ? tr.statusCalled :
              myTicket.status==='waiting' ? tr.statusWaiting(timeAgo(myTicket.createdAt)) :
+             myTicket.status==='done' ? tr.statusDone :
              tr.statusEnded) +
           '</div>'+
-          (myTicket.status!=='waiting' && myTicket.status!=='called' ?
+          (myTicket.status!=='waiting' && myTicket.status!=='called' && myTicket.status!=='done' ?
             '<button class="hn-back" id="hnNewEntry">'+tr.newEntry+'</button>' : '')+
         '</div></div>';
       if(document.getElementById('hnNewEntry')){
@@ -839,6 +846,15 @@
     busy = true;
     try{
       await loadState();
+      if(view==='customer' && myTicketId){
+        // Checked here (not just in the ticket render) so this fires even if
+        // the customer is on the "只今の待ち状況" tab when staff mark them done.
+        const myTicket = state.entries.find(e => e.id === myTicketId);
+        if(myTicket && myTicket.status==='done' && lastKnownTicketStatus !== 'done'){
+          lastKnownTicketStatus = 'done';
+          setTimeout(function(){ location.href = HOMEPAGE_URL; }, 2200);
+        }
+      }
       if(view==='staff' && !prunedThisSession){
         // One-time per staff session: drop finished entries past the 7-day
         // history window so the Firebase state doesn't grow unbounded.
