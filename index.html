@@ -253,7 +253,7 @@
   const root = document.getElementById('hnRoot');
   const FIREBASE_DB_URL = 'https://hounantei-waiting-default-rtdb.firebaseio.com';
   const TICKET_KEY = 'hn-my-ticket-id';
-  const APP_VERSION = 'V202608211015'; // bumped on every deploy — checked against version.json to auto-reload stale pages
+  const APP_VERSION = 'V202608211029'; // bumped on every deploy — checked against version.json to auto-reload stale pages
   const DAY_MS = 24*60*60*1000;
   const HISTORY_WINDOW_MS = 7 * DAY_MS; // staff history is kept and shown for a rolling 7 days
   const HOMEPAGE_URL = 'https://hountei.com/';
@@ -286,7 +286,7 @@
       statusCalled: 'お待たせいたしました。店内スタッフへお声掛けください。',
       statusEnded: 'このチケットは終了しています',
       statusDone: 'ご来店ありがとうございました。まもなくトップページに移動します',
-      newEntry: '新しく受付する',
+      newEntry: '新しい受付をする',
       justNow: 'たった今', waitMin: (n)=> n+'分待ち'
     },
     en: {
@@ -573,7 +573,7 @@
              myTicket.status==='done' ? tr.statusDone :
              tr.statusEnded) +
           '</div>'+
-          (myTicket.status!=='waiting' && myTicket.status!=='called' && myTicket.status!=='done' ?
+          (myTicket.status!=='waiting' && myTicket.status!=='called' ?
             '<button class="hn-back" id="hnNewEntry">'+tr.newEntry+'</button>' : '')+
         '</div></div>';
       if(document.getElementById('hnNewEntry')){
@@ -859,7 +859,12 @@
           await clearMyTicket();
         } else if(myTicket && myTicket.status==='done' && lastKnownTicketStatus !== 'done'){
           lastKnownTicketStatus = 'done';
-          setTimeout(function(){ location.href = HOMEPAGE_URL; }, 2200);
+          const ticketIdAtSchedule = myTicketId;
+          setTimeout(function(){
+            // Skip the redirect if the customer already left this ticket behind
+            // (e.g. tapped "新しい受付をする") before the delay elapsed.
+            if(myTicketId === ticketIdAtSchedule) location.href = HOMEPAGE_URL;
+          }, 2200);
         }
       }
       if(view==='staff' && !prunedThisSession){
