@@ -99,7 +99,7 @@
     display:flex; align-items:center; gap:10px; flex-wrap: wrap;
     background: rgba(217,74,48,0.12);
     border: 1px solid rgba(217,74,48,0.4);
-    color: var(--red-bright);
+    color: var(--paper);
     padding: 10px 14px; border-radius: 10px;
     font-size: 13px; font-weight: 700; letter-spacing: 0.03em;
     margin-bottom: 18px;
@@ -253,7 +253,7 @@
   const root = document.getElementById('hnRoot');
   const FIREBASE_DB_URL = 'https://hounantei-waiting-default-rtdb.firebaseio.com';
   const TICKET_KEY = 'hn-my-ticket-id';
-  const APP_VERSION = 'V202608210924'; // bumped on every deploy — checked against version.json to auto-reload stale pages
+  const APP_VERSION = 'V202608210932'; // bumped on every deploy — checked against version.json to auto-reload stale pages
   const DAY_MS = 24*60*60*1000;
   const HISTORY_WINDOW_MS = 7 * DAY_MS; // staff history is kept and shown for a rolling 7 days
 
@@ -696,6 +696,10 @@
       }
       historyGroupsByKey[key].items.push(e);
     });
+    const todayKey = dayKeyJa(Date.now());
+    const todayGroup = historyGroupsByKey[todayKey] || null;
+    const pastGroups = historyGroups.filter(g => g.key !== todayKey);
+    const todayOpen = openHistoryDays.has(todayKey);
 
     root.innerHTML =
       '<div class="hn-shell wide">'+ tabsHTML() +
@@ -707,8 +711,25 @@
         '<div class="hn-summary-item"><div class="hn-summary-num">'+(active.length? longestWaitMin+'分' : '−')+'</div><div class="hn-summary-label">最長待ち時間</div></div>'+
       '</div>'+
       '<div class="hn-history">'+
-        (historyGroups.length===0 ? '<div class="hn-history-toggle" style="cursor:default;"><span>過去7日間の対応履歴はまだありません</span></div>' :
-          historyGroups.map(function(g){
+        '<button class="hn-history-toggle" data-hist-key="'+todayKey+'">'+
+          '<span>本日の対応済みお客様（'+(todayGroup?todayGroup.items.length:0)+'組）</span>'+
+          '<span class="hn-chev">'+(todayOpen?'閉じる ▲':'開く ▼')+'</span>'+
+        '</button>'+
+        (todayOpen ? '<div class="hn-history-list">'+
+          (!todayGroup || todayGroup.items.length===0 ? '<div class="hn-empty">本日対応済みのお客様はまだいません</div>' :
+            todayGroup.items.map(historyRowHTML).join(''))+
+          '</div>' : '')+
+      '</div>'+
+      '<div class="hn-card">'+
+        '<div class="hn-staffbar"><span class="hn-updated">'+active.length+'組が待機中です</span>'+
+        '<button class="hn-reset" id="hnReset">本日の受付をリセット</button></div>'+
+        (active.length===0 ? '<div class="hn-empty">現在、待っているお客様はいません</div>' :
+          active.map(rowHTML).join('')) +
+      '</div>'+
+      (pastGroups.length===0 ? '' :
+        '<div class="hn-label" style="margin:20px 2px 8px;">過去の履歴</div>'+
+        '<div class="hn-history">'+
+          pastGroups.map(function(g){
             const open = openHistoryDays.has(g.key);
             return '<div class="hn-history-day">'+
               '<button class="hn-history-toggle" data-hist-key="'+g.key+'">'+
@@ -717,14 +738,9 @@
               '</button>'+
               (open ? '<div class="hn-history-list">'+g.items.map(historyRowHTML).join('')+'</div>' : '')+
             '</div>';
-          }).join(''))+
-      '</div>'+
-      '<div class="hn-card">'+
-        '<div class="hn-staffbar"><span class="hn-updated">'+active.length+'組が待機中です</span>'+
-        '<button class="hn-reset" id="hnReset">本日の受付をリセット</button></div>'+
-        (active.length===0 ? '<div class="hn-empty">現在、待っているお客様はいません</div>' :
-          active.map(rowHTML).join('')) +
-      '</div></div>';
+          }).join('')+
+        '</div>')+
+      '</div>';
     bindTabs();
 
     root.querySelectorAll('[data-hist-key]').forEach(btn=>{
