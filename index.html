@@ -253,7 +253,7 @@
   const root = document.getElementById('hnRoot');
   const FIREBASE_DB_URL = 'https://hounantei-waiting-default-rtdb.firebaseio.com';
   const TICKET_KEY = 'hn-my-ticket-id';
-  const APP_VERSION = 'V202608211000'; // bumped on every deploy — checked against version.json to auto-reload stale pages
+  const APP_VERSION = 'V202608211015'; // bumped on every deploy — checked against version.json to auto-reload stale pages
   const DAY_MS = 24*60*60*1000;
   const HISTORY_WINDOW_MS = 7 * DAY_MS; // staff history is kept and shown for a rolling 7 days
   const HOMEPAGE_URL = 'https://hountei.com/';
@@ -850,7 +850,14 @@
         // Checked here (not just in the ticket render) so this fires even if
         // the customer is on the "只今の待ち状況" tab when staff mark them done.
         const myTicket = state.entries.find(e => e.id === myTicketId);
-        if(myTicket && myTicket.status==='done' && lastKnownTicketStatus !== 'done'){
+        if(myTicket && !isToday(myTicket.createdAt)){
+          // A new day has started — don't keep showing yesterday's ticket
+          // (whatever its status) on the customer's phone. Forget it locally
+          // so re-opening the page or re-scanning the QR shows a fresh form.
+          myTicketId = null;
+          lastKnownTicketStatus = null;
+          await clearMyTicket();
+        } else if(myTicket && myTicket.status==='done' && lastKnownTicketStatus !== 'done'){
           lastKnownTicketStatus = 'done';
           setTimeout(function(){ location.href = HOMEPAGE_URL; }, 2200);
         }
